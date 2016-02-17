@@ -6,8 +6,95 @@ import theano.tensor as T
 
 
 def main():
-    import test_sequence
-    conv()
+    backward()
+
+
+def backward():
+    def back(nodes_t, score_t, t, prev_node):
+        return T.switch(t > 0, nodes_t[prev_node], nodes_t[T.argmax(score_t)])
+
+    max_nodes = T.imatrix()
+    max_scores = T.fmatrix()
+
+    nodes, _ = theano.scan(fn=back,
+                           sequences=[max_nodes[::-1], max_scores[::-1], T.arange(max_nodes.shape[0])],
+                           outputs_info=T.cast(0, 'int32'))
+
+    f = theano.function(inputs=[max_nodes, max_scores], outputs=nodes)
+
+    n = np.asarray([[0, 1], [1, 0], [0, 1], [0, 1]], dtype='int32')
+    s = np.asarray([[5, 6], [2, 1], [3, 2], [1, 2]], dtype='float32')
+
+    print f(n, s)
+
+
+def maximum():
+    e1 = np.asarray([[2, 4], [2, 1], [3, 2], [4, 1]], dtype='int32')
+    e2 = np.asarray([[2, 1], [3, 2], [3, 4], [2, 3]], dtype='int32')
+
+    w = T.imatrix('w')
+    a = T.imatrix('a')
+
+    y = T.maximum(w, a)
+    f = theano.function(inputs=[w, a], outputs=[y])
+
+    print f(e1, e2)
+
+
+def lookup():
+    e = theano.shared(np.asarray([[2, 1], [10, 3], [3, 5], [4, 6]], dtype='int32'))
+    w = T.imatrix('w')
+
+    y = e[w]
+    f = theano.function(inputs=[w], outputs=[y])
+
+    print f([[1, 2], [3, 1]])
+
+
+def max3d():
+    e = np.asarray([[[2, 1], [10, 3]], [[3, 5], [4, 6]]], dtype='int32')
+    w = T.itensor3('w')
+    a = T.iscalar('a')
+
+    y = T.argmax(w.reshape((w.shape[0], -1)), axis=1)
+    y_a = y / a
+    y_r = y % a
+#    y = T.max(w, axis=[1, 2])
+    f = theano.function(inputs=[w, a], outputs=[y, y_a, y_r])
+
+    print f(e, 2)
+
+
+def copy():
+    e = np.asarray([[[2, 4], [5, 1]], [[3, 5], [4, 6]]], dtype='int32')
+    w = T.itensor3('w')
+    u = T.ones(shape=(2, w.shape[2]))
+
+    y = T.repeat(T.max(w, axis=1, keepdims=True), 2, 1)
+#    y = T.max(w, axis=1, keepdims=True) * u
+    f = theano.function(inputs=[w], outputs=y)
+
+    print f(e)
+
+
+def typed_list():
+    import theano.typed_list
+    from theano.typed_list import TypedListType
+
+#    e = TypedListType(T.ivector)()
+    e = TypedListType(T.ivector)()
+    l = theano.typed_list.length(e)
+    emb = theano.shared(np.asarray([[1., 2.], [3., 4.], [5, 6], [5., 6.], [7., 8.], [9, 10]], dtype=theano.config.floatX))
+
+    def forward(l1, e1):
+        u = e1[l1]
+        return T.max(emb[u], axis=0)
+
+    y, _ = theano.scan(fn=forward, sequences=T.arange(l, dtype='int64'), outputs_info=[None], non_sequences=[e])
+    y = T.sum(y)
+
+    f = theano.function(inputs=[e], outputs=y)
+    print f([[1, 2], [3, 4, 5]])
 
 
 def sum():
@@ -53,28 +140,31 @@ def conv():
 
 #    e = np.asarray([[1, 2, 3, 4, 5, 6, 5, 6, 7, 8, 9, 10]], dtype=theano.config.floatX)
 #    e = np.asarray([[1, 1, 1, 1, 1], [1, 1, 2, 1, 1]], dtype=theano.config.floatX)
-    e = np.ones(shape=(1, 1, 5, 10), dtype=theano.config.floatX)
+    e = np.ones(shape=(1, 1, 10, 10), dtype=theano.config.floatX)  # 3D: n_char, 4D: emb_dim
 
 #    x = np.asarray([[1, 1], [1, 1], [1, 1]], dtype=theano.config.floatX)
 #    x = np.asarray([[[1], [1]], [[2], [1]]], dtype=theano.config.floatX)
 #    x = np.asarray([[1, 1, 1], [2, 1, 1]], dtype=theano.config.floatX)  # 1D: 2, 2D: 3
-    x = np.ones(shape=(6, 1, 1, 10), dtype=theano.config.floatX)  # 1D: resulting emb dim, 2D: char emb dim * window
+#    x = np.ones(shape=(5, 1, 3, 10), dtype=theano.config.floatX)  # 1D: resulting emb dim, 3D: n_window, 4D: char_emb_dim
+    x = np.ones(shape=(5, 50), dtype=theano.config.floatX)  # 1D: resulting emb dim, 3D: n_window, 4D: char_emb_dim
 #    x = np.asarray([[[1, 1], [1, 1], [1, 1]], [[1, 2], [1, 1], [1, 1]]], dtype=theano.config.floatX)
 #    x = np.asarray([[[1, 1]], [[2, 1]]], dtype=theano.config.floatX)
-    zero = theano.shared(np.zeros(shape=(1, 2), dtype=theano.config.floatX))
+    zero = theano.shared(np.zeros(shape=(1, 1, 2, 10), dtype=theano.config.floatX))
 
     w = T.ftensor4('w')
-    v = T.ftensor4('v')
+#    v = T.ftensor4('v')
+    v = T.fmatrix('w')
 #    w = T.fmatrix('w')
 #    v = T.ftensor3('v')
 #    v = T.fmatrix('v')
 
-#    u = T.concatenate([zero, w, zero], axis=1)
-    y = conv2d(input=w, filters=v)
-    y = y.reshape((y.shape[1], y.shape[2]))
+    s = v.reshape((v.shape[0], 1, 5, 10))
+    u = T.concatenate([zero, w, zero], axis=2)
+    y = conv2d(input=u, filters=s)
+    y = y.reshape((y.shape[1], y.shape[2]))  # 1D: h_dim, 2D: n_window_slides
 #    y = conv2d(input=w, filters=v)
 #    y = conv2d(input=u.T, filters=v.dimshuffle(0, 1, 'x'), subsample=(3, 1))
-#    y = T.max(c.reshape((c.shape[0], c.shape[1])), axis=1)
+#    y = T.max(y, axis=1)
 #    y = c.reshape((c.shape[0], c.shape[1]))
 #    y = u.T
     f = theano.function(inputs=[w, v], outputs=y)
@@ -82,6 +172,25 @@ def conv():
 
     print f(e, x)
 #    print f(e)
+
+
+def conv_2d():
+    from theano.tensor.signal.conv import conv2d
+    e = np.ones(shape=(8, 10), dtype=theano.config.floatX)
+    x = np.ones(shape=(3, 10), dtype=theano.config.floatX)
+    zero = theano.shared(np.zeros(shape=(1, 10), dtype=theano.config.floatX))
+
+    w = T.fmatrix('w')
+    v = T.fmatrix('v')
+
+    u = T.concatenate([zero, w, zero], axis=0)
+    y = conv2d(input=u.T, filters=v.dimshuffle(0, 1, 'x'), subsample=(3, 1))
+#    y = T.max(c.reshape((c.shape[0], c.shape[1])), axis=1)
+#    y = c.reshape((c.shape[0], c.shape[1]))
+#    y = u.T
+    f = theano.function(inputs=[w, v], outputs=y)
+
+    print f(e, x)
 
 
 def conv_batch():
