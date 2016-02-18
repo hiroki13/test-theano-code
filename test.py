@@ -6,24 +6,89 @@ import theano.tensor as T
 
 
 def main():
-    backward()
+    vitabi()
+
+
+def vitabi():
+    def transition(e_t, score_prev, trans):
+        return e_t.T + trans + score_prev
+
+    def forward_step(t, score_prev, e, b, trans):
+        score = T.switch(t > 0, transition(e[t-1], score_prev, trans), transition(b, score_prev, trans))
+        return T.max(score, axis=1), T.argmax(score, axis=1)
+
+    def backward_step(node_t, prev_node):
+        return prev_node, node_t[prev_node]
+
+    seq = T.fmatrix()
+    bos = T.fvector()
+    W = theano.shared(np.asarray([[1, 0], [2, 1]], dtype='float32'))
+    zero = theano.shared(np.zeros(shape=(2), dtype='float32'))
+
+    [max_scores, max_nodes], _ = theano.scan(fn=forward_step,
+                                             sequences=T.arange(seq.shape[0]+1),
+                                             outputs_info=[zero, None],
+                                             non_sequences=[seq, bos, W])
+
+    y_hat_index = T.argmax(max_scores[-1])
+    [path, _],  _ = theano.scan(fn=backward_step,
+                                sequences=max_nodes[::-1],
+                                outputs_info=[None, y_hat_index]
+                                )
+
+    y_score = max_scores[-1][y_hat_index]
+    y_hat_score = max_scores[-1][0]
+
+    f = theano.function(inputs=[seq, bos], outputs=[y_hat_score, y_score, path])
+
+    s = np.asarray([[5, 6], [2, 4], [3, 2], [1, 2]], dtype='float32')
+    b = np.asarray([200, 100], dtype='float32')
+
+    print f(s, b)
+
+
+def forward():
+    def transition(e_t, score_prev, trans):
+        return e_t.T + trans + score_prev
+
+    def forward_step(t, score_prev, e, b, trans):
+        score = T.switch(t > 0, transition(e[t-1], score_prev, trans), transition(b, score_prev, trans))
+        return T.max(score, axis=1), T.argmax(score, axis=1)
+
+    seq = T.fmatrix()
+    bos = T.fvector()
+    W = theano.shared(np.asarray([[1, 0], [2, 1]], dtype='float32'))
+    zero = theano.shared(np.zeros(shape=(2), dtype='float32'))
+
+    [scores, nodes], _ = theano.scan(fn=forward_step,
+                                     sequences=T.arange(seq.shape[0]+1),
+                                     outputs_info=[zero, None],
+                                     non_sequences=[seq, bos, W])
+
+    f = theano.function(inputs=[seq, bos], outputs=[scores, nodes])
+
+    x1 = np.asarray([[5, 6], [2, 4], [3, 2], [1, 2]], dtype='float32')
+    x2 = np.asarray([200, 100], dtype='float32')
+
+    print f(x1, x2)
 
 
 def backward():
-    def back(nodes_t, score_t, t, prev_node):
-        return T.switch(t > 0, nodes_t[prev_node], nodes_t[T.argmax(score_t)])
+    def backward_step(node_t, prev_node):
+        return prev_node, node_t[prev_node]
 
     max_nodes = T.imatrix()
     max_scores = T.fmatrix()
 
-    nodes, _ = theano.scan(fn=back,
-                           sequences=[max_nodes[::-1], max_scores[::-1], T.arange(max_nodes.shape[0])],
-                           outputs_info=T.cast(0, 'int32'))
+    [path, _],  _ = theano.scan(fn=backward_step,
+                                sequences=max_nodes[::-1],
+                                outputs_info=[None, T.cast(T.argmax(max_scores[-1]), 'int32')]
+                                )
 
-    f = theano.function(inputs=[max_nodes, max_scores], outputs=nodes)
+    f = theano.function(inputs=[max_nodes, max_scores], outputs=path)
 
     n = np.asarray([[0, 1], [1, 0], [0, 1], [0, 1]], dtype='int32')
-    s = np.asarray([[5, 6], [2, 1], [3, 2], [1, 2]], dtype='float32')
+    s = np.asarray([[7, 6], [2, 1], [3, 2], [1, 2]], dtype='float32')
 
     print f(n, s)
 
