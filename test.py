@@ -1,12 +1,612 @@
-__author__ = 'hiroki'
-
 import numpy as np
 import theano
 import theano.tensor as T
 
 
 def main():
-    vitabi()
+    lookup()
+
+
+def index():
+    cands = T.imatrix('cands')
+    h_in = np.asarray([[1, 0], [0, 1]], dtype='int32')
+
+    y = T.dot(cands, T.arange(cands.shape[-1]))
+    f = theano.function(inputs=[cands], outputs=[y], on_unused_input='ignore')
+    print f(h_in)
+
+
+def norm():
+#    cands = T.imatrix('cands')
+    cands = T.ivector('cands')
+#    h_in = np.asarray([[1, 2], [3, 4]], dtype='int32')
+    h_in = np.asarray([2, 4], dtype='int32')
+
+    y = cands.norm(2, axis=0)
+    f = theano.function(inputs=[cands], outputs=[y], on_unused_input='ignore')
+    print f(h_in)
+
+
+def outer():
+#    cands = T.itensor3('cands')
+    cands = T.imatrix('cands')
+#    cands = T.ivector('cands')
+#    h_in = np.asarray([[[1, 2], [3, 4]], [[5, 6], [7, 8]]], dtype='int32')
+    h_in = np.asarray([[1, 2], [3, 4]], dtype='int32')
+#    h_in = np.asarray([2, 4], dtype='int32')
+#    h_in = np.asarray([[1, 2, 3], [2, 1, 3]], dtype='int32')
+
+    y = T.outer(cands, cands)
+    f = theano.function(inputs=[cands], outputs=[y], on_unused_input='ignore')
+    print f(h_in)
+
+
+def sort():
+#    cands = T.itensor3('cands')
+    cands = T.imatrix('cands')
+#    h_in = np.asarray([[[1, 2], [3, 4]], [[5, 6], [7, 8]]], dtype='int32')
+#    h_in = np.asarray([[1, 2], [3, 4]], dtype='int32')
+    h_in = np.asarray([[4, 2], [3, 1]], dtype='int32')
+
+    y = T.sort(cands, axis=1)
+    f = theano.function(inputs=[cands], outputs=[y], on_unused_input='ignore')
+    print f(h_in)
+
+
+def flip():
+#    cands = T.itensor3('cands')
+    cands = T.imatrix('cands')
+#    h_in = np.asarray([[[1, 2], [3, 4]], [[5, 6], [7, 8]]], dtype='int32')
+    h_in = np.asarray([[1, 2], [3, 4]], dtype='int32')
+
+    y = cands[::-1]
+    f = theano.function(inputs=[cands], outputs=[y], on_unused_input='ignore')
+    print f(h_in)
+
+
+def attention_origin():
+    query = T.imatrix('query')
+    cands = T.itensor3('cands')
+
+    d = 2
+    W1_c = theano.shared(np.random.randint(-3, 3, (d, d)))
+#    W1_c = theano.shared(np.ones((d, d), dtype='int32'))
+    W1_h = theano.shared(np.random.randint(-3, 3, (d, d)))
+#    W1_h = theano.shared(np.ones((d, d), dtype='int32'))
+    w    = theano.shared(np.ones((d,), dtype='float32'))
+    W2_r = theano.shared(np.random.randint(-1, 1, (d, d)))
+    W2_h = theano.shared(np.random.randint(-1, 1, (d, d)))
+#    W2_r = theano.shared(np.ones((d, d), dtype='float32'))
+#    W2_h = theano.shared(np.ones((d, d), dtype='float32'))
+
+    q_in = np.asarray([[1, 2]], dtype='int32')
+#    q_in = np.ones((1, 2), dtype='int32')
+    C_in = np.ones((1, 3, 2), dtype='int32')
+
+    def forward(h_before, C):
+        # C is batch * len * d
+        # h is batch * d
+
+        M = T.dot(C, W1_c) + T.dot(h_before, W1_h).dimshuffle((0, 'x', 1))
+
+        # batch*len*1
+        alpha = T.nnet.softmax(T.dot(M, w))
+        alpha = alpha.reshape((alpha.shape[0], alpha.shape[1], 1))
+
+        # batch * d
+        r = T.sum(C * alpha, axis=1)
+
+        # batch * d
+        h_after = T.dot(r, W2_r) + T.dot(h_before, W2_h)
+
+        return h_after, r, alpha.reshape((alpha.shape[0], alpha.shape[1])), M
+
+    y, a, b, c = forward(query, cands)
+    f = theano.function(inputs=[query, cands], outputs=[y, a, b, c], on_unused_input='ignore')
+    print f(q_in, C_in)
+
+
+def attention_q():
+    query = T.itensor3('query')
+    cands = T.itensor3('cands')
+
+    d = 2
+    W1_c = theano.shared(np.random.randint(-3, 3, (d, d)))
+#    W1_c = theano.shared(np.ones((d, d), dtype='int32'))
+    W1_h = theano.shared(np.random.randint(-3, 3, (d, d)))
+#    W1_h = theano.shared(np.ones((d, d), dtype='int32'))
+    w    = theano.shared(np.ones((d,), dtype='float32'))
+    W2_r = theano.shared(np.random.randint(-1, 1, (d, d)))
+    W2_h = theano.shared(np.random.randint(-1, 1, (d, d)))
+#    W2_r = theano.shared(np.ones((d, d), dtype='float32'))
+#    W2_h = theano.shared(np.ones((d, d), dtype='float32'))
+
+#    q_in = np.asarray([[[1, 2], [3, 4], [5, 6]]], dtype='int32')
+    q_in = np.ones((1, 3, 2), dtype='int32')
+#    C_in = np.ones((1, 3, 2), dtype='int32')
+#    C_in = np.ones((4, 3, 3, 2), dtype='int32')
+    C_in = np.asarray(np.random.randint(-2, 2, (1, 3, 2)), dtype='int32')
+
+    def forward(query, cands, eps=1e-8):
+        # cands: 1D: n_queries, 2D: n_cands-1, 3D: dim_h
+        # query: 1D: n_queries, 2D: n_words, 3D: dim_h
+        # mask: 1D: n_queries, 2D: n_cands, 3D: n_words
+
+        # 1D: n_queries, 2D: n_cands-1, 3D: n_words, 4D: dim_h
+        M = T.dot(query, W1_c).dimshuffle(0, 'x', 1, 2) + T.dot(cands, W1_h).dimshuffle(0, 1, 'x', 2)
+
+        # 1D: n_queries, 2D: n_cands-1, 3D: n_words
+        alpha = T.nnet.softmax(T.dot(M, w).reshape((cands.shape[0] * cands.shape[1], query.shape[1])))
+        alpha = alpha.reshape((cands.shape[0], cands.shape[1], query.shape[1], 1))
+
+        # 1D: n_queries, 2D: n_cands-1, 3D: n_words
+        r = T.sum(query.dimshuffle((0, 'x', 1, 2)) * alpha, axis=2)  # 4 * 3 * 2
+
+        # 1D: n_queries, 2D: n_cands, 3D: dim_h
+        h_after = T.dot(r, W2_r)  # 4 * 3 * 2
+#        return h_after, h_after
+        return h_after, r, alpha.reshape((alpha.shape[0], alpha.shape[1], alpha.shape[2])), M
+
+    y, a, b, c = forward(query, cands)
+    f = theano.function(inputs=[query, cands], outputs=[y, a, b, c], on_unused_input='ignore')
+    print f(q_in, C_in)
+
+
+def seq_attention():
+    # x: 1D: n_words, 2D: Batch, 3D n_h
+    h = T.itensor3('x')
+
+    d = 2
+    W1_c = theano.shared(np.ones((d, d), dtype='int32'))
+    W1_h = theano.shared(np.ones((d, d), dtype='int32'))
+    w    = theano.shared(np.ones((d,), dtype='int32'))
+    W2_r = theano.shared(np.ones((d, d), dtype='int32'))
+    W2_h = theano.shared(np.ones((d, d), dtype='int32'))
+
+    h_in = np.asarray([[[1, 2], [3, 4]], [[5, 6], [7, 8]]], dtype='int32')
+
+    y, _ = theano.scan(fn=one_attention,
+                       sequences=h,
+                       outputs_info=None,
+                       non_sequences=[h, W1_c, W1_h, w, W2_r, W2_h]
+                       )
+
+    f = theano.function(inputs=[h], outputs=[y])
+    print f(h_in)
+
+
+def one_attention(h, C, W1_c, W1_h, w, W2_r, W2_h, eps=1e-8):
+    M = T.dot(C, W1_c) + T.dot(h, W1_h).dimshuffle(0, 'x', 'x', 1)  # 4 * 3 * 3 * 2
+
+    # batch * len * 1
+    alpha = T.dot(M, w)  # 4 * 3 * 3
+    alpha /= T.sum(alpha, axis=2, keepdims=True) + eps
+    alpha = alpha.reshape((alpha.shape[0], alpha.shape[1], alpha.shape[2], 1))
+
+    # batch * d
+    r = T.sum(C * alpha, axis=2)  # 4 * 3 * 2
+
+    # batch * d
+    # 4 * 3 * 2
+#    return T.tanh(T.dot(r, W2_r) + T.dot(h, W2_h))
+    return T.dot(r, W2_r) + T.dot(h, W2_h)
+
+
+def attention():
+#    q = T.fmatrix('q')
+#    C = T.ftensor4('C')
+    q = T.imatrix('q')
+    C = T.itensor4('C')
+
+    d = 2
+    W1_c = theano.shared(np.random.randint(-3, 3, (d, d)))
+#    W1_c = theano.shared(np.ones((d, d), dtype='int32'))
+    W1_h = theano.shared(np.random.randint(-3, 3, (d, d)))
+#    W1_h = theano.shared(np.ones((d, d), dtype='int32'))
+    w    = theano.shared(np.ones((d,), dtype='float32'))
+    W2_r = theano.shared(np.random.randint(-1, 1, (d, d)))
+    W2_h = theano.shared(np.random.randint(-1, 1, (d, d)))
+#    W2_r = theano.shared(np.ones((d, d), dtype='float32'))
+#    W2_h = theano.shared(np.ones((d, d), dtype='float32'))
+
+#    q_in = np.asarray([[1, 2], [3, 4], [-1, -2], [-3, -4]], dtype='int32')
+    q_in = np.asarray([[1, 2]], dtype='int32')
+#    q_in = np.asarray([[1, 2], [3, 4], [5, 6], [7, 8]], dtype='float32')
+    C_in = np.ones((1, 3, 3, 2), dtype='int32')
+#    C_in = np.ones((4, 3, 3, 2), dtype='int32')
+#    C_in = np.asarray(np.random.randint(-2, 2, (1, 3, 3, 2)), dtype='int32')
+
+    def forward(h_before, _C, eps=1e-8):
+        # C: n_queries * n_cands * n_words * dim_h
+        # h: n_queries * dim_h
+
+#        M = T.tanh(T.dot(_C, W1_c) + T.dot(h_before, W1_h).dimshuffle(0, 'x', 'x', 1))
+        M = T.dot(_C, W1_c) + T.dot(h_before, W1_h).dimshuffle(0, 'x', 'x', 1)  # 4 * 3 * 3 * 2
+#        M = T.dot(h_before, W1_h).dimshuffle(0, 'x', 'x', 1)
+
+        # batch * len * 1
+        alpha = T.exp(T.dot(M, w))  # 4 * 3 * 3
+#        alpha = T.nnet.softmax(T.dot(M, w))  # 4 * 3 * 3
+        alpha /= T.sum(alpha, axis=2, keepdims=True) + eps
+#        alpha = alpha.reshape((alpha.shape[0], alpha.shape[1], 1))
+        alpha = alpha.reshape((alpha.shape[0], alpha.shape[1], alpha.shape[2], 1))
+
+        # batch * d
+#        r = T.sum(_C * alpha, axis=1)
+        r_in = _C * alpha
+        r = T.sum(r_in, axis=1)  # 4 * 3 * 2
+
+        # batch * d
+        h_after = T.dot(r, W2_r) + T.dot(h_before, W2_h).dimshuffle((0, 'x', 1))  # 4 * 3 * 2
+#        return h_after
+        return h_after, r, alpha, M
+
+    y, a, b, m = forward(q, C)
+    f = theano.function(inputs=[q, C], outputs=[y, a, b, m], on_unused_input='ignore')
+    print f(q_in, C_in)
+
+
+def softmax_3d():
+    C_in = np.ones((3, 3, 2), dtype='float32')
+    m = T.ftensor3()
+
+    z = T.sum(m, axis=2, keepdims=True)
+    y = m / z
+
+    f = theano.function(inputs=[m], outputs=[y], on_unused_input='ignore')
+    print f(C_in)
+
+
+def add_b():
+    w = T.imatrix('w')
+    a = T.imatrix('a')
+    y = w + a.repeat(4, 0)
+    f = theano.function(inputs=[w, a], outputs=[y])
+
+    e = np.asarray([[2, 4], [2, 1], [3, 2], [4, 1]], dtype='int32')
+    b = np.asarray([[2, 1]], dtype='int32')
+    print f(e, b)
+
+
+def zero_pad_gate():
+    dim_emb = 2
+    window = 1
+#    w = T.imatrix('w')
+    w = T.itensor3('w')
+    zero = T.zeros((1, 1, dim_emb * window), dtype=theano.config.floatX)
+
+#    y = T.eq(w, zero)
+    y = T.eq(T.sum(T.eq(w, zero), 2, keepdims=True), 0) * w
+    f = theano.function(inputs=[w], outputs=[y])
+
+    e = np.asarray([[[2, 4], [0, 0]], [[3, 2], [4, 1]]], dtype='int32')
+    print f(e)
+
+#    return T.eq(T.sum(T.eq(matrix, self.zero), 2, keepdims=True), dim_emb * window)
+
+def double_roop():
+    a = T.fmatrix('a')
+    r = T.zeros(shape=(5, 2), dtype=theano.config.floatX)
+
+    def recursive(t, s):
+        def forward(_t, seq):
+#            z_t = zero[:seq.shape[0]]
+#            h_t = T.set_subtensor(z_t, seq)
+            return seq[_t] + 1
+
+        u, _ = theano.scan(fn=forward,
+                                sequences=T.arange(s[t].shape[0]),
+                                outputs_info=None,
+                                non_sequences=s[t])
+#                                n_steps=s.shape[0]-1)
+        return u
+
+    y, _ = theano.scan(fn=recursive,
+                       sequences=[T.arange(a.shape[0])],
+                       outputs_info=None,
+                       non_sequences=a)
+
+#    y = recursive(a)
+    f = theano.function(inputs=[a], outputs=[y])
+    e = np.asarray([[2, 4], [2, 1], [3, 2], [4, 1]], dtype=theano.config.floatX)
+    print f(e)
+
+
+def grnn_one_gate():
+    np.random.seed(0)
+    matrix = T.ftensor3('a')
+    n_d = 2
+
+    W = theano.shared(np.random.uniform(low=-1., high=1., size=(n_d * 2, n_d)))
+    U = theano.shared(np.random.uniform(low=-1., high=1., size=(n_d * 3, n_d * 3)))
+    G = theano.shared(np.random.uniform(low=-1., high=1., size=(n_d * 2, n_d * 2)))
+
+    eps = 1e-8
+
+    def step(m):
+        h_l = m[:, 0]
+        h_r = m[:, 1]
+
+        # 1D: batch, 2D: 2 * n_d
+        r = T.nnet.sigmoid(T.dot(T.concatenate([h_l, h_r], axis=1), G))
+        half = r.shape[1]/2
+        # 1D: batch, 2D: n_d
+        r_l = r[:, :half]
+        r_r = r[:, half:]
+
+        # 1D: batch, 2D: n_d
+        h_hat = T.tanh(T.dot(T.concatenate([r_l * h_l, r_r * h_r], axis=1), W))
+
+        # 1D: batch, 2D: 3 * n_d
+        z_hat = T.exp(T.dot(T.concatenate([h_hat, h_l, h_r], axis=1), U))
+        # 1D: batch, 2D: 3 (h_hat, h_l, h_r), 3D: n_d
+        z_hat = z_hat.reshape((z_hat.shape[0], 3, z_hat.shape[1] / 3))
+
+        # 1D: batch, 2D: n_d
+        Z = T.sum(z_hat, axis=1)
+        # 1D: batch, 2D: 3, 3D: n_d
+        Z = T.repeat(Z, repeats=3, axis=1).reshape((Z.shape[0], n_d, 3)).dimshuffle((0, 2, 1))
+
+        z = z_hat / Z + eps
+
+        h = h_hat * z[:, 0] + h_l * z[:, 1] + h_r * z[:, 2]
+
+        seq_sub_tensor = h
+        return seq_sub_tensor
+
+    y = step(matrix)
+    f = theano.function(inputs=[matrix],
+                        outputs=[y])
+#    e = np.asarray([[[2, 4], [2, 1], [3, 2], [4, 1]], [[1, 3], [2, 3], [2, 1], [3, 2]]], dtype=theano.config.floatX)
+    e = np.ones((2, 4, n_d), dtype='float32')
+    print f(e)
+
+
+def grnn_batch_gate():
+    matrix = T.ftensor3('a')
+    n_d = 2
+
+#    W = theano.shared(np.ones((n_e * 2, n_d), dtype='float32'))
+    W = theano.shared(np.random.uniform(low=-1., high=1., size=(n_d * 2, n_d)))
+    U = theano.shared(np.random.uniform(low=-1., high=1., size=(n_d * 3, n_d * 3)))
+    G = theano.shared(np.random.uniform(low=-1., high=1., size=(n_d * 2, n_d * 2)))
+
+
+#    zero = T.zeros(shape=matrix.shape, dtype=theano.config.floatX)
+    zero = T.zeros(shape=(matrix.shape[0], matrix.shape[1], n_d), dtype=theano.config.floatX)
+    eps = 1e-8
+
+    def recursive(t, m):
+        def step(_t, _m):
+            h_l = _m[:, _t]
+            h_r = _m[:, _t + 1]
+
+            # 1D: batch, 2D: 2 * n_d
+            r = T.nnet.sigmoid(T.dot(T.concatenate([h_l, h_r], axis=1), G))
+            half = r.shape[1]/2
+            # 1D: batch, 2D: n_d
+            r_l = r[:, :half]
+            r_r = r[:, half:]
+
+            # 1D: batch, 2D: n_d
+            h_hat = T.tanh(T.dot(T.concatenate([r_l * h_l, r_r * h_r], axis=1), W))
+
+            # 1D: batch, 2D: 3 * n_d
+            z_hat = T.exp(T.dot(T.concatenate([h_hat, h_l, h_r], axis=1), U))
+            # 1D: batch, 2D: 3 (h_hat, h_l, h_r), 3D: n_d
+            z_hat = z_hat.reshape((z_hat.shape[0], 3, z_hat.shape[1] / 3))
+
+            # 1D: batch, 2D: n_d
+            Z = T.sum(z_hat, axis=1)
+#            Z = T.sum(z_hat, axis=1, keepdims=True)
+            # 1D: batch, 2D: 3, 3D: n_d
+            Z = T.repeat(Z, repeats=3, axis=1).reshape((Z.shape[0], n_d, 3)).dimshuffle((0, 2, 1))
+#            Z = T.repeat(Z, repeats=3, axis=2).dimshuffle((0, 2, 1))
+
+            z = z_hat / Z + eps
+
+            h = h_hat * z[:, 0] + h_l * z[:, 1] + h_r * z[:, 2]
+
+            seq_sub_tensor = h
+            return _m, seq_sub_tensor
+
+        [_, u], _ = theano.scan(fn=step,
+                                sequences=T.arange(m.shape[1] - t - 1),
+                                outputs_info=[m, None])
+
+        return T.set_subtensor(zero[:, :m.shape[1] - t - 1], u.dimshuffle((1, 0, 2)))
+
+    y, _ = theano.scan(fn=recursive,
+                       sequences=T.arange(matrix.shape[1]-1),
+                       outputs_info=matrix)
+
+    params = [W, G]
+    cost = T.mean(y)
+    updates = [(W, W - T.grad(cost=cost, wrt=W)), (G, G - T.grad(cost=cost, wrt=G)), (U, U - T.grad(cost=cost, wrt=U))]
+
+    y = y[-1][:, 0]
+    f = theano.function(inputs=[matrix],
+                        outputs=[y],
+                        updates=updates)
+
+    e = np.asarray([[[2, 4], [2, 1], [3, 2], [4, 1]], [[1, 3], [2, 3], [2, 1], [3, 2]]], dtype=theano.config.floatX)
+    for i in xrange(5):
+        print i
+        print f(e)
+
+
+def grnn_batch():
+    matrix = T.ftensor3('a')
+    n_e = 2
+    n_d = 2
+
+#    W = theano.shared(np.ones((n_e * 2, n_d), dtype='float32'))
+    W = theano.shared(np.random.uniform(low=-1., high=1., size=(n_d * 2, n_d)))
+
+
+#    zero = T.zeros(shape=matrix.shape, dtype=theano.config.floatX)
+    zero = T.zeros(shape=(matrix.shape[0], matrix.shape[1], n_d), dtype=theano.config.floatX)
+
+    def recursive(t, m):
+        def step(_t, _m):
+            m_t = T.concatenate([_m[:, _t], _m[:, _t + 1]], axis=1)
+            seq_sub_tensor = T.dot(m_t, W)
+            return _m, seq_sub_tensor
+
+        [_, u], _ = theano.scan(fn=step,
+                                sequences=T.arange(m.shape[1] - t - 1),
+                                outputs_info=[m, None])
+
+        return T.set_subtensor(zero[:, :m.shape[1] - t - 1], u.dimshuffle((1, 0, 2)))
+
+    y, _ = theano.scan(fn=recursive,
+                       sequences=T.arange(matrix.shape[1]-1),
+                       outputs_info=matrix)
+
+    updates = [(W, W - T.grad(cost=T.mean(y), wrt=W))]
+
+    y = y[-1][:, 0]
+    f = theano.function(inputs=[matrix],
+                        outputs=[y],
+                        updates=updates)
+
+    e = np.asarray([[[2, 4], [2, 1], [3, 2], [4, 1]], [[1, 3], [2, 3], [2, 1], [3, 2]]], dtype=theano.config.floatX)
+    for i in xrange(5):
+        print i
+        print f(e)
+
+
+def grnn():
+    matrix = T.fmatrix('a')
+#    W = theano.shared(np.zeros((2, 2), dtype='float32'))
+    W = theano.shared(np.random.uniform(low=-1., high=1., size=(2, 2)))
+    zero = T.zeros(shape=(4, 2), dtype=theano.config.floatX)
+
+    def recursive(t, m):
+        def step(_t, _m):
+            seq_sub_tensor = T.dot(_m[_t] + _m[_t + 1], W)
+            return _m, seq_sub_tensor
+
+        [_, u], _ = theano.scan(fn=step,
+                                sequences=T.arange(m.shape[0] - t - 1),
+                                outputs_info=[m, None])
+
+        return T.set_subtensor(zero[:m.shape[0] - t - 1], u)
+
+    y, _ = theano.scan(fn=recursive,
+                       sequences=T.arange(matrix.shape[0]-1),
+                       outputs_info=matrix)
+
+    updates = [(W, W - T.grad(cost=T.mean(y), wrt=W))]
+
+    f = theano.function(inputs=[matrix],
+                        outputs=[y],
+                        updates=updates)
+
+    e = np.asarray([[2, 4], [2, 1], [3, 2], [4, 1]], dtype=theano.config.floatX)
+    for i in xrange(5):
+        print i
+        print f(e)
+
+
+def refined_grnn():
+    matrix = T.fmatrix('a')
+    zero = T.zeros(shape=(4, 2), dtype=theano.config.floatX)
+
+    def recursive(t, m):
+        def forward(_t, _m):
+            seq_sub_tensor = _m[_t] + _m[_t + 1]
+            return _m, seq_sub_tensor
+
+        [_, u], _ = theano.scan(fn=forward,
+                                sequences=T.arange(m.shape[0] - t - 1),
+                                outputs_info=[m, None])
+        return T.set_subtensor(zero[:m.shape[0] - t - 1], u)
+
+    y, _ = theano.scan(fn=recursive,
+                       sequences=T.arange(matrix.shape[0]-1),
+                       outputs_info=matrix)
+
+    f = theano.function(inputs=[matrix], outputs=[y])
+    e = np.asarray([[2, 4], [2, 1], [3, 2], [4, 1]], dtype=theano.config.floatX)
+    print f(e)
+
+
+def switch():
+    w = T.imatrix('w')
+    a = T.ivector('a')
+#    y = T.switch(T.eq(w, a.reshape((a.shape[0], 1))), T.eq(a.reshape((a.shape[0], 1)), 1), 0)
+    y = T.switch(a, 1, 0)
+#    f = theano.function(inputs=[w, a], outputs=[y])
+    f = theano.function(inputs=[a], outputs=[y])
+
+    e = np.asarray([[2, 0], [2, 1], [3, 2], [2, 1]], dtype='int32')
+    b = np.asarray([0, 7, 1, 1], dtype='int32')
+#    print f(e, b)
+    print f(b)
+
+
+def eq():
+    w = T.imatrix('w')
+    a = T.ivector('a')
+#    y = T.sum(T.eq(w, a.reshape((a.shape[0], 1))), 0)
+#    y = T.eq(w, a.reshape((a.shape[0], 1)))
+    y = T.neq(w, 3)
+    f = theano.function(inputs=[w], outputs=[y])
+
+    e = np.asarray([[2, 4], [2, 1], [3, 2], [4, 1]], dtype='int32')
+    b = np.asarray([2, 1, 1, 0], dtype='int8')
+    print f(e)
+
+
+def printing():
+    from theano import pp, tensor as T
+    x = T.dscalar('x')
+    y = x ** 2
+    gy = T.grad(y, x)
+    pp(gy)
+
+
+def logsumexp_v(e):
+    a = T.fvector()
+    b = T.max(a)
+    y = b + T.log(T.sum(T.exp(a-b)))
+    f = theano.function(inputs=[a], outputs=[y])
+    print e - f(e)
+
+
+def softmax(e):
+    a = T.fvector()
+    y = T.log(T.nnet.softmax(a))
+    f = theano.function(inputs=[a], outputs=[y])
+    print f(e)
+
+
+def logsumexp_new():
+    return
+
+
+def typed_list_with_shared():
+    # typed_list cannot contain shared variable and numpy
+
+    from theano.typed_list import TypedListType
+
+    e = TypedListType(T.fvector)()
+    u = T.fvector()
+    o = theano.typed_list.append(e, u)
+    x = [[1., 2.], [3., 4., 5.], [5., 6., 7], [5., 6.]]
+
+    f = theano.function(inputs=[e, u], outputs=[o])
+    print f([], [1., 2., 4.])
+
+
+def broadcast():
+    w = T.imatrix('w')
+    y = w * T.ones(shape=(2, w.shape[0], w.shape[1]))
+    f = theano.function(inputs=[w], outputs=[y])
+
+    e = np.asarray([[2, 4], [2, 1], [3, 2], [4, 1]], dtype='int32')
+    print f(e)
 
 
 def vitabi():
@@ -108,26 +708,43 @@ def maximum():
 
 def lookup():
     e = theano.shared(np.asarray([[2, 1], [10, 3], [3, 5], [4, 6]], dtype='int32'))
-    w = T.imatrix('w')
+#    w = T.imatrix('w')
+#    v = T.imatrix('v')
+#    v = T.itensor3('v')
+#    w = T.ivector('w')
+    v = T.ivector('v')
+    w = T.itensor3('w')
 
-    y = e[w]
-    f = theano.function(inputs=[w], outputs=[y])
+    y = w[T.arange(w.shape[0]), v]
+#    y = w[:, v]
+    f = theano.function(inputs=[w, v], outputs=[y])
 
-    print f([[1, 2], [3, 1]])
+#    print f([[1, 2], [3, 4]],
+#            [[0, 1, 1], [1, 0, -1]])
+    print f([[[0, 0], [0, 1], [0, 1]], [[1, 1], [1, 0], [1, -1]]],
+            [1, 2])
+#    print f([1, 2],
+#            [0, 1, 1])
+#    print f([[[5, 2], [3, 1], [2, 1]], [[1, 2], [3, 4], [5, 6]]])
 
 
 def max3d():
     e = np.asarray([[[2, 1], [10, 3]], [[3, 5], [4, 6]]], dtype='int32')
+    v = np.asarray([0, 1], dtype='int32')
     w = T.itensor3('w')
-    a = T.iscalar('a')
+    a = T.ivector('a')
 
-    y = T.argmax(w.reshape((w.shape[0], -1)), axis=1)
-    y_a = y / a
-    y_r = y % a
+#    y = T.max(w, axis=1)
+#    y = T.max(w[:, :, :1], axis=1)
+#    y = w[T.arange(a.shape[0]), a]
+    y = w[:, a]
+#    y_a = y / a
+#    y_r = y % a
 #    y = T.max(w, axis=[1, 2])
-    f = theano.function(inputs=[w, a], outputs=[y, y_a, y_r])
+#    f = theano.function(inputs=[w, a], outputs=[y, y_a, y_r])
+    f = theano.function(inputs=[w, a], outputs=[y])
 
-    print f(e, 2)
+    print f(e, v)
 
 
 def copy():
@@ -165,7 +782,7 @@ def typed_list():
 def sum():
     e = np.asarray([[1., 2.], [3., 4.], [5, 6], [5., 6.], [7., 8.], [9, 10]], dtype=theano.config.floatX)
     w = T.fmatrix('w')
-    y = T.sum(w)
+    y = T.sum(w, 1)
     f = theano.function(inputs=[w], outputs=y)
     print f(e)
 
@@ -232,11 +849,31 @@ def conv():
 #    y = T.max(y, axis=1)
 #    y = c.reshape((c.shape[0], c.shape[1]))
 #    y = u.T
-    f = theano.function(inputs=[w, v], outputs=y)
+    f = theano.function(inputs=[w, v], outputs=[u, y])
 #    f = theano.function(inputs=[w], outputs=w.T)
 
     print f(e, x)
 #    print f(e)
+
+
+def conv_with_scan():
+    dim_c_emb = 10
+    window = 5
+    h_emb = 10
+    c_emb_in = np.ones(shape=(10, dim_c_emb), dtype=theano.config.floatX)  # 1D: n_char, 2D: emb_dim
+    w_in = np.ones(shape=(dim_c_emb * window, h_emb), dtype=theano.config.floatX)  # 1D: resulting emb dim, 3D: n_window, 4D: char_emb_dim
+
+    w = T.fmatrix('w')
+    c_emb = T.fmatrix('v')
+    zero = theano.shared(np.zeros(shape=(window/2, dim_c_emb), dtype=theano.config.floatX))
+    win = T.iscalar('win')
+
+    u = T.concatenate([zero, c_emb, zero], axis=0)
+    u_in = u[:win].flatten()
+    y = T.dot(u_in, w)
+    f = theano.function(inputs=[c_emb, w, win], outputs=[u_in, y])
+
+    print f(c_emb_in, w_in, window)
 
 
 def conv_2d():
@@ -281,34 +918,42 @@ def sigmoid():
 
 
 def mean():
-    e = np.asarray([[[2, 4], [5, 1]], [[3, 5], [4, 6]]], dtype='float32')
+    e = np.asarray([[[2, 4], [5, 1], [2, 3]], [[3, 5], [4, 6], [3, 1]]], dtype='float32')
     w = T.ftensor3('w')
 
-#    y = T.mean(w, axis=[1, 2], keepdims=True)
-    y = T.argmax(w, axis=2)
+    y = T.concatenate([T.mean(w[:, :2], axis=1), T.mean(w[:, 1:], axis=1)], 1)
+#    y = w[:, 1:]
     f = theano.function(inputs=[w], outputs=y)
 
     print f(e)
-#    print f([[[2, 4], [2, 1]], [1, 2, 3]])
 
 
 def multiply():
-    e1 = np.asarray([2, 4], dtype='int32')
-    e2 = np.asarray([[1, 2]], dtype='int32')
-    w = T.ivector('v1')
+    e1 = np.asarray([[2, 4, 1], [3, 1, 2]], dtype='int32')
+    e2 = np.asarray([[1, 0], [0, 1]], dtype='int32')
+    w = T.imatrix('v1')
     v = T.imatrix('v2')
 
-    y = v * w
-    f = theano.function(inputs=[v, w], outputs=y)
+#    y = w * v.reshape((v.shape[0], v.shape[1], 1)) #T.repeat(v, 2, 1)
+    y = w.dimshuffle(0, 'x', 1) * v.dimshuffle(0, 1, 'x') #T.repeat(v, 2, 1)
+    f = theano.function(inputs=[w, v], outputs=y)
 
-    print f(e2, e1)
+    print f(e1, e2)
 
 
 def repeat():
-    e = np.asarray([[[2, 4], [5, 1]]], dtype='int32')
+#    e = np.asarray([[[2, 4], [5, 1], [2, 1]]], dtype='int32')
+    e = np.asarray([[[2, 4], [5, 1], [2, 10]], [[20, 4], [5, 10], [20, 1]]], dtype='int32')
+#    e = np.asarray([[[4], [1], [2]], [[4], [5], [1]]], dtype='int32')
+#    e = np.asarray([[2, 4], [5, 1]], dtype='int32')
     w = T.itensor3('w')
+#    w = T.imatrix('w')
 
-    y = T.repeat(w, T.cast(w.shape[1], dtype='int32'), 0)
+#    y = T.repeat(w, T.cast(w.shape[1], dtype='int32'), 0)[T.arange(w.shape[1]), 1:]
+#    y = T.sum(w, axis=1)
+    y = T.repeat(T.sum(w, axis=1), 2, axis=1).reshape((w.shape[0], 2, 2))
+#    y = T.repeat(T.repeat(w, T.cast(w.shape[1], dtype='int32'), 0)[T.arange(w.shape[1]), 1:], 2, 0)
+#    y = T.repeat(w, 2, 0)
     f = theano.function(inputs=[w], outputs=y)
 
     print f(e)
@@ -318,7 +963,7 @@ def tensor_max():
     e = np.asarray([[[2, 4], [5, 1]], [[3, 5], [4, 6]]], dtype='int32')
     w = T.itensor3('w')
 
-    y = T.repeat(T.max(w, axis=1, keepdims=True), 3, 1)
+    y = T.max(w, axis=1)
     f = theano.function(inputs=[w], outputs=y)
 
     print f(e)
@@ -333,7 +978,8 @@ def add():
     v1 = T.ivector('v1')
 
 #    y = T.max_and_argmax(w, 1)
-    y = v1 * T.ones_like(w)
+#    y = v1 * T.ones_like(w)
+    y = v1 + w
     f = theano.function(inputs=[w, v1], outputs=y)
 
     print f(e1, e2)
@@ -394,11 +1040,6 @@ def test_logsumexp():
 #    print f2(E)
 #    print 'f2',
 #    print f2(E2)
-
-
-def logsumexp_v(a):
-    b = T.max(a)
-    return b + T.log(T.sum(T.exp(a-b)))
 
 
 def logsumexp(x, axis=None):
@@ -557,13 +1198,17 @@ def test_lookup():
 
 
 def test_dot():
-    a = T.itensor3()
+#    a = T.itensor3()
     W = T.imatrix()
-    y = T.dot(a, W)
-    f = theano.function(inputs=[a, W], outputs=[y])
-    u = [[[1, 2], [2, 4]], [[3, 1], [2, 1]]]
-    w = [[1, 1], [1, 1]]
-    print f(u, w)
+    a = T.ones(shape=(2, W.shape[0], W.shape[1]), dtype='int32')
+#    y = T.dot(a, W)
+    y = a * W
+    f = theano.function(inputs=[W], outputs=[y])
+#    u = [[[1, 2], [2, 4]], [[3, 1], [2, 1]]]
+#    w = [[1, 1], [1, 1]]
+    u = [[1, 2], [2, 4]]
+#    print f(u, w)
+    print f(u)
 
 
 def test_vitabi_learning():
